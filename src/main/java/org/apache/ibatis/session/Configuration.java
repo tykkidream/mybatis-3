@@ -474,6 +474,7 @@ public class Configuration {
     return newExecutor(transaction, defaultExecutorType);
   }
 
+  // Mybatis支持对 Executor、StatementHandler、PameterHandler 和 ResultSetHandler 进行拦截。
   public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
     executorType = executorType == null ? defaultExecutorType : executorType;
     executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
@@ -488,6 +489,8 @@ public class Configuration {
     if (cacheEnabled) {
       executor = new CachingExecutor(executor);
     }
+	// interceptorChain 对象里保存了所有的拦截器，它在 MyBatis 初始化的时候创建。
+	// 这句代码的含义是调用拦截器链里的每个拦截器依次对 executor 进行拦截。
     executor = (Executor) interceptorChain.pluginAll(executor);
     return executor;
   }
