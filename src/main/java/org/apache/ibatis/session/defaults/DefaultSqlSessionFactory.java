@@ -42,34 +42,74 @@ public class DefaultSqlSessionFactory implements SqlSessionFactory {
     this.configuration = configuration;
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession() {
     return openSessionFromDataSource(configuration.getDefaultExecutorType(), null, false);
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(boolean autoCommit) {
     return openSessionFromDataSource(configuration.getDefaultExecutorType(), null, autoCommit);
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(ExecutorType execType) {
     return openSessionFromDataSource(execType, null, false);
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(TransactionIsolationLevel level) {
     return openSessionFromDataSource(configuration.getDefaultExecutorType(), level, false);
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(ExecutorType execType, TransactionIsolationLevel level) {
     return openSessionFromDataSource(execType, level, false);
   }
 
+  /**
+  * <h3>从数据源创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(ExecutorType execType, boolean autoCommit) {
     return openSessionFromDataSource(execType, null, autoCommit);
   }
 
+  /**
+  * <h3>从数据库连接创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(Connection connection) {
     return openSessionFromConnection(configuration.getDefaultExecutorType(), connection);
   }
 
+  /**
+  * <h3>从数据库连接创建 SqlSession</h3>
+  * 以默认参数创建 SqlSession ，主要是由 {@link #openSessionFromDataSource() } 来创建，参数分别为
+  * configuration.getDefaultExecutorType(), null, false 。
+  */
   public SqlSession openSession(ExecutorType execType, Connection connection) {
     return openSessionFromConnection(execType, connection);
   }
@@ -78,14 +118,28 @@ public class DefaultSqlSessionFactory implements SqlSessionFactory {
     return configuration;
   }
 
+  /**
+  * <h3>实际创建 SqlSession</h3>
+  * 
+  * @param execType SQL 语句执行方式，会影响 Executor 。
+  * @param level 事务隔离级别。	
+  * @param autoCommit 是否自动提交，也就是说是否启用事务。	
+  * 
+  */
   private SqlSession openSessionFromDataSource(ExecutorType execType, TransactionIsolationLevel level, boolean autoCommit) {
     Transaction tx = null;
     try {
-      final Environment environment = configuration.getEnvironment();
-      final TransactionFactory transactionFactory = getTransactionFactoryFromEnvironment(environment);
-      tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);
-      final Executor executor = configuration.newExecutor(tx, execType);
-      return new DefaultSqlSession(configuration, executor, autoCommit);
+		// Configuration 是全局配置。
+		// 1、 从 Configuration 中获取 Environment 。Environment 是全局配置中的数据库连接环境。
+		final Environment environment = configuration.getEnvironment();
+		// 2、 视 Environment 的情况获取 TransactionFactory 。TransactionFactory 是事务工厂。
+		final TransactionFactory transactionFactory = getTransactionFactoryFromEnvironment(environment);
+		// 3、 创建 Transaction 。Transaction 是事务。
+		tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);
+		// 3、 创建 Executor 。Transaction 是事务。
+		final Executor executor = configuration.newExecutor(tx, execType);
+		// 4、 创建 SqlSession 。DefaultSqlSession 是 SqlSession 的默认实现。
+		return new DefaultSqlSession(configuration, executor, autoCommit);
     } catch (Exception e) {
       closeTransaction(tx); // may have fetched a connection so lets call close()
       throw ExceptionFactory.wrapException("Error opening session.  Cause: " + e, e);
