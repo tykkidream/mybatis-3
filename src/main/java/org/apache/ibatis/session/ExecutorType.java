@@ -16,9 +16,21 @@
 package org.apache.ibatis.session;
 
 /**
+ * <p>执行器（ {@link org.apache.ibatis.executor.Executor Executor} ）执行 SQL的方式</p>
  * 
  * @author Clinton Begin
  */
 public enum ExecutorType {
-  SIMPLE, REUSE, BATCH
+	/**
+	 * 简单。{@link org.apache.ibatis.executor.Executor Executor} 使用的默认方式。
+	 */
+  SIMPLE, 
+  /**
+   * 重用。
+   */
+  REUSE, 
+  /**
+   * 批处理。
+   */
+  BATCH
 }

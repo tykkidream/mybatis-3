@@ -23,6 +23,10 @@ import java.util.Map;
 import org.apache.ibatis.executor.BatchResult;
 
 /**
+ * <h3>一次数据库会话</h3>
+ * 
+ * 
+ * <hr>
  * The primary Java interface for working with MyBatis.
  * Through this interface you can execute commands, get mappers and manage transactions.
  *
