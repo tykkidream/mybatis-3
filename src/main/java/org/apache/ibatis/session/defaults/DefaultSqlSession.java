@@ -219,9 +219,6 @@ public class DefaultSqlSession implements SqlSession {
 		return configuration;
 	}
 
-	/**
-	 * 获得某个操作数据访问接口的代理对象。
-	 */
 	public <T> T getMapper(Class<T> type) {
 		return configuration.<T> getMapper(type, this);
 	}

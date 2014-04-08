@@ -90,16 +90,29 @@ import org.apache.ibatis.type.TypeHandlerRegistry;
 
 /**
  * <h3>MyBatis 的总配置</h3>
- * <p>包含所有的配置信息，并有能创建处理相关配置数据的功能类对象，可以理解为全局唯一的上下文，很多类中都保存了其引用。</p>
- * <p>MyBatis 大部分的功能都有本类提供的支持，尤其是主要功能获得的支持得多，但是它们的功能范围也受到了本类的限制， 而且一些常用的
- *功能是从本类开始的（比如获取 {@link SqlSession} ），处于核心的地位，所以可以理解一个 Configuration 实例代表了一个 MyBatis 实例 。</p>
- * <p>本类允许手工实例创建，同一个 JVM 中可以存在多个，它们之间是不会发生任何关系。也没有提方法（一般是静态方法）便捷地
- * 获得本类实例，所以需要本类实例时可以从具有本类引用的类中获取，比如  {@link SqlSession}、 {@link BaseExecutor}、等 。另外用户可以将
- * {@link SqlSessionFactory} 保存在全局静态变量中，并提供静态方法获取。</p>
+ * <p>包含全部的配置数据，具有重要功能的类都需要这些配置数据，所以很多类中都保存了其引用。</p>
+ * <p>那些重要的功能类可以手工创建，但需要一些必要的配置数据，创建过程不简便。所以提供了一些方便的方法供使用，
+ * 这些方法就在本类中，
+ * 可理解为全局唯一的上下文，也可认为一个 Configuration 实例代表了一个 MyBatis 实例 。
+ * 
  * <p>
- * 注意上文中的说明，在阅读源代码时会发现一些重要的方法中，首先要保证拥有一个 Configuration 的引用，但是使用的方式各不相同，由于据现
- * 在的了解程度不高暂且不保证是同一个 Configuration ，最终结果可能会有所不同。
+ * 并提供了方法去创建具有处理配置数据的功能的对象，如以下方法：
+ * <ul>
+ * <li>{@link #newExecutor(Transaction)} 、{@link #newExecutor(Transaction, ExecutorType)} ；</li>
+ * <li>{@link #getMapper(Class, SqlSession)} ；</li>
+ * <li>{@link #newResultSetHandler(Executor, MappedStatement, RowBounds, ParameterHandler, ResultHandler, BoundSql)} ；</li>
+ * </ul>
  * </p>
+
+ * <p>
+ * 本类允许手工实例创建，同一个 JVM 中可以存在多个，它们之间是不会发生任何关系。也没有提供方法（一般是静态方法）便捷地 获得本类实例，
+ * 所以需要本类实例时可以从具有本类引用的类中获取，比如 {@link SqlSession} 、 {@link BaseExecutor}、等 。另外用户可以将 {@link SqlSessionFactory} 保存在全局静态变量中，并提供静态方法获取。
+ * </p>
+ * <p>
+ * 注意上文中的说明，在阅读源代码时会发现一些重要的方法中，首先要保证拥有一个 Configuration 的引用，但是使用的方式各不相同，
+ * 由于据现在的了解程度不高暂且不保证是同一个 Configuration ，最终结果可能会有所不同。
+ * </p>
+ * <hr>
  * @author Clinton Begin
  */
 public class Configuration {
