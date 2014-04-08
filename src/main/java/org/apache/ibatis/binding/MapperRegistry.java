@@ -33,75 +33,88 @@ import java.util.Set;
  */
 public class MapperRegistry {
 
-  private Configuration config;
-  private final Map<Class<?>, MapperProxyFactory<?>> knownMappers = new HashMap<Class<?>, MapperProxyFactory<?>>();
+	private Configuration config;
+	
+	/**
+	 * 
+	 */
+	private final Map<Class<?>, MapperProxyFactory<?>> knownMappers = new HashMap<Class<?>, MapperProxyFactory<?>>();
 
-  public MapperRegistry(Configuration config) {
-    this.config = config;
-  }
+	public MapperRegistry(Configuration config) {
+		this.config = config;
+	}
 
-  @SuppressWarnings("unchecked")
-  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
-    final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
-    if (mapperProxyFactory == null)
-      throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
-    try {
-      return mapperProxyFactory.newInstance(sqlSession);
-    } catch (Exception e) {
-      throw new BindingException("Error getting mapper instance. Cause: " + e, e);
-    }
-  }
-  
-  public <T> boolean hasMapper(Class<T> type) {
-    return knownMappers.containsKey(type);
-  }
+	/**
+	 * <h3>得到 Mapper 接口的实例</h3>
+	 * <p>创建某个接口的实例（代理对象）。</p>
+	 * @param type
+	 * @param sqlSession
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
+		// 1、获取 MapperProxyFactory 。唯一对应一个接口，是一个接口的实例工厂。
+		final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
+		if (mapperProxyFactory == null)
+			throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
+		try {
+			// 2、工厂创建接口的实例。
+			return mapperProxyFactory.newInstance(sqlSession);
+		} catch (Exception e) {
+			throw new BindingException("Error getting mapper instance. Cause: " + e, e);
+		}
+	}
 
-  public <T> void addMapper(Class<T> type) {
-    if (type.isInterface()) {
-      if (hasMapper(type)) {
-        throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
-      }
-      boolean loadCompleted = false;
-      try {
-        knownMappers.put(type, new MapperProxyFactory<T>(type));
-        // It's important that the type is added before the parser is run
-        // otherwise the binding may automatically be attempted by the
-        // mapper parser. If the type is already known, it won't try.
-        MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
-        parser.parse();
-        loadCompleted = true;
-      } finally {
-        if (!loadCompleted) {
-          knownMappers.remove(type);
-        }
-      }
-    }
-  }
+	public <T> boolean hasMapper(Class<T> type) {
+		return knownMappers.containsKey(type);
+	}
 
-  /**
-   * @since 3.2.2
-   */
-  public Collection<Class<?>> getMappers() {
-    return Collections.unmodifiableCollection(knownMappers.keySet());
-  }
+	public <T> void addMapper(Class<T> type) {
+		if (type.isInterface()) {
+			if (hasMapper(type)) {
+				throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
+			}
+			boolean loadCompleted = false;
+			try {
+				knownMappers.put(type, new MapperProxyFactory<T>(type));
+				// It's important that the type is added before the parser is run
+				// otherwise the binding may automatically be attempted by the
+				// mapper parser. If the type is already known, it won't try.
+				MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+				parser.parse();
+				loadCompleted = true;
+			} finally {
+				if (!loadCompleted) {
+					knownMappers.remove(type);
+				}
+			}
+		}
+	}
 
-  /**
-   * @since 3.2.2
-   */
-  public void addMappers(String packageName, Class<?> superType) {
-    ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<Class<?>>();
-    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
-    Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
-    for (Class<?> mapperClass : mapperSet) {
-      addMapper(mapperClass);
-    }
-  }
+	/**
+	 * @since 3.2.2
+	 */
+	public Collection<Class<?>> getMappers() {
+		return Collections.unmodifiableCollection(knownMappers.keySet());
+	}
 
-  /**
-   * @since 3.2.2
-   */
-  public void addMappers(String packageName) {
-    addMappers(packageName, Object.class);
-  }
-  
+	/**
+	 * @since 3.2.2
+	 */
+	public void addMappers(String packageName, Class<?> superType) {
+		ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<Class<?>>();
+		resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+		Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
+		for (Class<?> mapperClass : mapperSet) {
+			addMapper(mapperClass);
+		}
+	}
+
+	/**
+	 * @since 3.2.2
+	 */
+	public void addMappers(String packageName) {
+		addMappers(packageName, Object.class);
+	}
+
 }

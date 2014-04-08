@@ -39,6 +39,7 @@ import org.apache.ibatis.cache.impl.PerpetualCache;
 import org.apache.ibatis.datasource.jndi.JndiDataSourceFactory;
 import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSourceFactory;
+import org.apache.ibatis.executor.BaseExecutor;
 import org.apache.ibatis.executor.BatchExecutor;
 import org.apache.ibatis.executor.CachingExecutor;
 import org.apache.ibatis.executor.Executor;
@@ -88,741 +89,787 @@ import org.apache.ibatis.type.TypeAliasRegistry;
 import org.apache.ibatis.type.TypeHandlerRegistry;
 
 /**
+ * <h3>MyBatis 的总配置</h3>
+ * <p>包含所有的配置信息，并有能创建处理相关配置数据的功能类对象，可以理解为全局唯一的上下文，很多类中都保存了其引用。</p>
+ * <p>MyBatis 大部分的功能都有本类提供的支持，尤其是主要功能获得的支持得多，但是它们的功能范围也受到了本类的限制， 而且一些常用的
+ *功能是从本类开始的（比如获取 {@link SqlSession} ），处于核心的地位，所以可以理解一个 Configuration 实例代表了一个 MyBatis 实例 。</p>
+ * <p>本类允许手工实例创建，同一个 JVM 中可以存在多个，它们之间是不会发生任何关系。也没有提方法（一般是静态方法）便捷地
+ * 获得本类实例，所以需要本类实例时可以从具有本类引用的类中获取，比如  {@link SqlSession}、 {@link BaseExecutor}、等 。另外用户可以将
+ * {@link SqlSessionFactory} 保存在全局静态变量中，并提供静态方法获取。</p>
+ * <p>
+ * 注意上文中的说明，在阅读源代码时会发现一些重要的方法中，首先要保证拥有一个 Configuration 的引用，但是使用的方式各不相同，由于据现
+ * 在的了解程度不高暂且不保证是同一个 Configuration ，最终结果可能会有所不同。
+ * </p>
  * @author Clinton Begin
  */
 public class Configuration {
 
-  protected Environment environment;
-
-  protected boolean safeRowBoundsEnabled = false;
-  protected boolean safeResultHandlerEnabled = true;
-  protected boolean mapUnderscoreToCamelCase = false;
-  protected boolean aggressiveLazyLoading = true;
-  protected boolean multipleResultSetsEnabled = true;
-  protected boolean useGeneratedKeys = false;
-  protected boolean useColumnLabel = true;
-  protected boolean cacheEnabled = true;
-  protected boolean callSettersOnNulls = false;
-  protected String logPrefix;
-  protected Class <? extends Log> logImpl;
-  protected LocalCacheScope localCacheScope = LocalCacheScope.SESSION;
-  protected JdbcType jdbcTypeForNull = JdbcType.OTHER;
-  protected Set<String> lazyLoadTriggerMethods = new HashSet<String>(Arrays.asList(new String[] { "equals", "clone", "hashCode", "toString" }));
-  protected Integer defaultStatementTimeout;
-  protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;
-  protected AutoMappingBehavior autoMappingBehavior = AutoMappingBehavior.PARTIAL;
-
-  protected Properties variables = new Properties();
-  protected ObjectFactory objectFactory = new DefaultObjectFactory();
-  protected ObjectWrapperFactory objectWrapperFactory = new DefaultObjectWrapperFactory();
-  protected MapperRegistry mapperRegistry = new MapperRegistry(this);
-
-  protected boolean lazyLoadingEnabled = false;
-  protected ProxyFactory proxyFactory;
-
-  protected String databaseId;
-  /**
-   * Configuration factory class.
-   * Used to create Configuration for loading deserialized unread properties.
-   *
-   * @see <a href='https://code.google.com/p/mybatis/issues/detail?id=300'>Issue 300</a> (google code)
-   */
-  protected Class<?> configurationFactory;
-
-  protected final InterceptorChain interceptorChain = new InterceptorChain();
-  protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry();
-  protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
-  protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
-
-  protected final Map<String, MappedStatement> mappedStatements = new StrictMap<MappedStatement>("Mapped Statements collection");
-  protected final Map<String, Cache> caches = new StrictMap<Cache>("Caches collection");
-  protected final Map<String, ResultMap> resultMaps = new StrictMap<ResultMap>("Result Maps collection");
-  protected final Map<String, ParameterMap> parameterMaps = new StrictMap<ParameterMap>("Parameter Maps collection");
-  protected final Map<String, KeyGenerator> keyGenerators = new StrictMap<KeyGenerator>("Key Generators collection");
-
-  protected final Set<String> loadedResources = new HashSet<String>();
-  protected final Map<String, XNode> sqlFragments = new StrictMap<XNode>("XML fragments parsed from previous mappers");
-
-  protected final Collection<XMLStatementBuilder> incompleteStatements = new LinkedList<XMLStatementBuilder>();
-  protected final Collection<CacheRefResolver> incompleteCacheRefs = new LinkedList<CacheRefResolver>();
-  protected final Collection<ResultMapResolver> incompleteResultMaps = new LinkedList<ResultMapResolver>();
-  protected final Collection<MethodResolver> incompleteMethods = new LinkedList<MethodResolver>();
-
-  /*
-   * A map holds cache-ref relationship. The key is the namespace that
-   * references a cache bound to another namespace and the value is the
-   * namespace which the actual cache is bound to.
-   */
-  protected final Map<String, String> cacheRefMap = new HashMap<String, String>();
-
-  public Configuration(Environment environment) {
-    this();
-    this.environment = environment;
-  }
-
-  public Configuration() {
-    typeAliasRegistry.registerAlias("JDBC", JdbcTransactionFactory.class);
-    typeAliasRegistry.registerAlias("MANAGED", ManagedTransactionFactory.class);
-
-    typeAliasRegistry.registerAlias("JNDI", JndiDataSourceFactory.class);
-    typeAliasRegistry.registerAlias("POOLED", PooledDataSourceFactory.class);
-    typeAliasRegistry.registerAlias("UNPOOLED", UnpooledDataSourceFactory.class);
-
-    typeAliasRegistry.registerAlias("PERPETUAL", PerpetualCache.class);
-    typeAliasRegistry.registerAlias("FIFO", FifoCache.class);
-    typeAliasRegistry.registerAlias("LRU", LruCache.class);
-    typeAliasRegistry.registerAlias("SOFT", SoftCache.class);
-    typeAliasRegistry.registerAlias("WEAK", WeakCache.class);
-
-    typeAliasRegistry.registerAlias("DB_VENDOR", VendorDatabaseIdProvider.class);
-
-    typeAliasRegistry.registerAlias("XML", XMLLanguageDriver.class);
-    typeAliasRegistry.registerAlias("RAW", RawLanguageDriver.class);
-
-    typeAliasRegistry.registerAlias("SLF4J", Slf4jImpl.class);
-    typeAliasRegistry.registerAlias("COMMONS_LOGGING", JakartaCommonsLoggingImpl.class);
-    typeAliasRegistry.registerAlias("LOG4J", Log4jImpl.class);
-    typeAliasRegistry.registerAlias("LOG4J2", Log4j2Impl.class);
-    typeAliasRegistry.registerAlias("JDK_LOGGING", Jdk14LoggingImpl.class);
-    typeAliasRegistry.registerAlias("STDOUT_LOGGING", StdOutImpl.class);
-    typeAliasRegistry.registerAlias("NO_LOGGING", NoLoggingImpl.class);
-
-    typeAliasRegistry.registerAlias("CGLIB", CglibProxyFactory.class);
-    typeAliasRegistry.registerAlias("JAVASSIST", JavassistProxyFactory.class);
-
-    languageRegistry.setDefaultDriverClass(XMLLanguageDriver.class);
-    languageRegistry.register(RawLanguageDriver.class);
-  }
-
-  public String getLogPrefix() {
-    return logPrefix;
-  }
-
-  public void setLogPrefix(String logPrefix) {
-    this.logPrefix = logPrefix;
-  }
-
-  public Class<? extends Log> getLogImpl() {
-    return logImpl;
-  }
-
-  @SuppressWarnings("unchecked")
-  public void setLogImpl(Class<?> logImpl) {
-    if (logImpl != null) {
-      this.logImpl = (Class<? extends Log>) logImpl;
-      LogFactory.useCustomLogging(this.logImpl);
-    }
-  }
-
-  public boolean isCallSettersOnNulls() {
-    return callSettersOnNulls;
-  }
-
-  public void setCallSettersOnNulls(boolean callSettersOnNulls) {
-    this.callSettersOnNulls = callSettersOnNulls;
-  }
-
-  public String getDatabaseId() {
-    return databaseId;
-  }
-
-  public void setDatabaseId(String databaseId) {
-    this.databaseId = databaseId;
-  }
-
-  public Class<?> getConfigurationFactory() {
-    return configurationFactory;
-  }
-
-  public void setConfigurationFactory(Class<?> configurationFactory) {
-    this.configurationFactory = configurationFactory;
-  }
-
-  public boolean isSafeResultHandlerEnabled() {
-    return safeResultHandlerEnabled;
-  }
-
-  public void setSafeResultHandlerEnabled(boolean safeResultHandlerEnabled) {
-    this.safeResultHandlerEnabled = safeResultHandlerEnabled;
-  }
-
-  public boolean isSafeRowBoundsEnabled() {
-    return safeRowBoundsEnabled;
-  }
-
-  public void setSafeRowBoundsEnabled(boolean safeRowBoundsEnabled) {
-    this.safeRowBoundsEnabled = safeRowBoundsEnabled;
-  }
-
-  public boolean isMapUnderscoreToCamelCase() {
-    return mapUnderscoreToCamelCase;
-  }
-
-  public void setMapUnderscoreToCamelCase(boolean mapUnderscoreToCamelCase) {
-    this.mapUnderscoreToCamelCase = mapUnderscoreToCamelCase;
-  }
-
-  public void addLoadedResource(String resource) {
-    loadedResources.add(resource);
-  }
-
-  public boolean isResourceLoaded(String resource) {
-    return loadedResources.contains(resource);
-  }
-
-  public Environment getEnvironment() {
-    return environment;
-  }
-
-  public void setEnvironment(Environment environment) {
-    this.environment = environment;
-  }
-
-  public AutoMappingBehavior getAutoMappingBehavior() {
-    return autoMappingBehavior;
-  }
-
-  public void setAutoMappingBehavior(AutoMappingBehavior autoMappingBehavior) {
-    this.autoMappingBehavior = autoMappingBehavior;
-  }
-
-  public boolean isLazyLoadingEnabled() {
-    return lazyLoadingEnabled;
-  }
-
-  public void setLazyLoadingEnabled(boolean lazyLoadingEnabled) {
-    this.lazyLoadingEnabled = lazyLoadingEnabled;
-  }
-
-  public ProxyFactory getProxyFactory() {
-    if (proxyFactory == null) {
-      // makes sure CGLIB is not needed unless explicitly requested
-      proxyFactory = new CglibProxyFactory();
-    }
-    return proxyFactory;
-  }
-
-  public void setProxyFactory(ProxyFactory proxyFactory) {
-    this.proxyFactory = proxyFactory;
-  }
-
-  public boolean isAggressiveLazyLoading() {
-    return aggressiveLazyLoading;
-  }
-
-  public void setAggressiveLazyLoading(boolean aggressiveLazyLoading) {
-    this.aggressiveLazyLoading = aggressiveLazyLoading;
-  }
-
-  public boolean isMultipleResultSetsEnabled() {
-    return multipleResultSetsEnabled;
-  }
-
-  public void setMultipleResultSetsEnabled(boolean multipleResultSetsEnabled) {
-    this.multipleResultSetsEnabled = multipleResultSetsEnabled;
-  }
-
-  public Set<String> getLazyLoadTriggerMethods() {
-    return lazyLoadTriggerMethods;
-  }
-
-  public void setLazyLoadTriggerMethods(Set<String> lazyLoadTriggerMethods) {
-    this.lazyLoadTriggerMethods = lazyLoadTriggerMethods;
-  }
-
-  public boolean isUseGeneratedKeys() {
-    return useGeneratedKeys;
-  }
-
-  public void setUseGeneratedKeys(boolean useGeneratedKeys) {
-    this.useGeneratedKeys = useGeneratedKeys;
-  }
-
-  public ExecutorType getDefaultExecutorType() {
-    return defaultExecutorType;
-  }
-
-  public void setDefaultExecutorType(ExecutorType defaultExecutorType) {
-    this.defaultExecutorType = defaultExecutorType;
-  }
-
-  public boolean isCacheEnabled() {
-    return cacheEnabled;
-  }
-
-  public void setCacheEnabled(boolean cacheEnabled) {
-    this.cacheEnabled = cacheEnabled;
-  }
-
-  public Integer getDefaultStatementTimeout() {
-    return defaultStatementTimeout;
-  }
-
-  public void setDefaultStatementTimeout(Integer defaultStatementTimeout) {
-    this.defaultStatementTimeout = defaultStatementTimeout;
-  }
-
-  public boolean isUseColumnLabel() {
-    return useColumnLabel;
-  }
-
-  public void setUseColumnLabel(boolean useColumnLabel) {
-    this.useColumnLabel = useColumnLabel;
-  }
-
-  public LocalCacheScope getLocalCacheScope() {
-    return localCacheScope;
-  }
-
-  public void setLocalCacheScope(LocalCacheScope localCacheScope) {
-    this.localCacheScope = localCacheScope;
-  }
-
-  public JdbcType getJdbcTypeForNull() {
-    return jdbcTypeForNull;
-  }
-
-  public void setJdbcTypeForNull(JdbcType jdbcTypeForNull) {
-    this.jdbcTypeForNull = jdbcTypeForNull;
-  }
-
-  public Properties getVariables() {
-    return variables;
-  }
-
-  public void setVariables(Properties variables) {
-    this.variables = variables;
-  }
-
-  public TypeHandlerRegistry getTypeHandlerRegistry() {
-    return typeHandlerRegistry;
-  }
-
-  public TypeAliasRegistry getTypeAliasRegistry() {
-    return typeAliasRegistry;
-  }
-
-  /**
-   * @since 3.2.2
-   */
-  public MapperRegistry getMapperRegistry() {
-    return mapperRegistry;
-  }
-
-  public ObjectFactory getObjectFactory() {
-    return objectFactory;
-  }
-
-  public void setObjectFactory(ObjectFactory objectFactory) {
-    this.objectFactory = objectFactory;
-  }
-
-  public ObjectWrapperFactory getObjectWrapperFactory() {
-    return objectWrapperFactory;
-  }
-
-  public void setObjectWrapperFactory(ObjectWrapperFactory objectWrapperFactory) {
-    this.objectWrapperFactory = objectWrapperFactory;
-  }
-
-  /**
-   * @since 3.2.2
-   */
-  public List<Interceptor> getInterceptors() {
-    return interceptorChain.getInterceptors();
-  }
-
-  public LanguageDriverRegistry getLanguageRegistry() {
-    return languageRegistry;
-  }
-
-  public void setDefaultScriptingLanguage(Class<?> driver) {
-    if (driver == null) {
-      driver = XMLLanguageDriver.class;
-    }
-    getLanguageRegistry().setDefaultDriverClass(driver);
-  }
-
-  public LanguageDriver getDefaultScriptingLanuageInstance() {
-    return languageRegistry.getDefaultDriver();
-  }
-
-  public MetaObject newMetaObject(Object object) {
-    return MetaObject.forObject(object, objectFactory, objectWrapperFactory);
-  }
-
-  public ParameterHandler newParameterHandler(MappedStatement mappedStatement, Object parameterObject, BoundSql boundSql) {
-    ParameterHandler parameterHandler = mappedStatement.getLang().createParameterHandler(mappedStatement, parameterObject, boundSql);
-    parameterHandler = (ParameterHandler) interceptorChain.pluginAll(parameterHandler);
-    return parameterHandler;
-  }
-
-  public ResultSetHandler newResultSetHandler(Executor executor, MappedStatement mappedStatement, RowBounds rowBounds, ParameterHandler parameterHandler,
-      ResultHandler resultHandler, BoundSql boundSql) {
-    ResultSetHandler resultSetHandler = new DefaultResultSetHandler(executor, mappedStatement, parameterHandler, resultHandler, boundSql, rowBounds);
-    resultSetHandler = (ResultSetHandler) interceptorChain.pluginAll(resultSetHandler);
-    return resultSetHandler;
-  }
-
-  public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
-    StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds, resultHandler, boundSql);
-    statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
-    return statementHandler;
-  }
-
-  public Executor newExecutor(Transaction transaction) {
-    return newExecutor(transaction, defaultExecutorType);
-  }
-
-  // Mybatis支持对 Executor、StatementHandler、PameterHandler 和 ResultSetHandler 进行拦截。
-  public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
-    executorType = executorType == null ? defaultExecutorType : executorType;
-    executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
-    Executor executor;
-    if (ExecutorType.BATCH == executorType) {
-      executor = new BatchExecutor(this, transaction);
-    } else if (ExecutorType.REUSE == executorType) {
-      executor = new ReuseExecutor(this, transaction);
-    } else {
-      executor = new SimpleExecutor(this, transaction);
-    }
-    if (cacheEnabled) {
-      executor = new CachingExecutor(executor);
-    }
-	// interceptorChain 对象里保存了所有的拦截器，它在 MyBatis 初始化的时候创建。
-	// 这句代码的含义是调用拦截器链里的每个拦截器依次对 executor 进行拦截。
-    executor = (Executor) interceptorChain.pluginAll(executor);
-    return executor;
-  }
-
-  public void addKeyGenerator(String id, KeyGenerator keyGenerator) {
-    keyGenerators.put(id, keyGenerator);
-  }
-
-  public Collection<String> getKeyGeneratorNames() {
-    return keyGenerators.keySet();
-  }
-
-  public Collection<KeyGenerator> getKeyGenerators() {
-    return keyGenerators.values();
-  }
-
-  public KeyGenerator getKeyGenerator(String id) {
-    return keyGenerators.get(id);
-  }
-
-  public boolean hasKeyGenerator(String id) {
-    return keyGenerators.containsKey(id);
-  }
-
-  public void addCache(Cache cache) {
-    caches.put(cache.getId(), cache);
-  }
-
-  public Collection<String> getCacheNames() {
-    return caches.keySet();
-  }
-
-  public Collection<Cache> getCaches() {
-    return caches.values();
-  }
-
-  public Cache getCache(String id) {
-    return caches.get(id);
-  }
-
-  public boolean hasCache(String id) {
-    return caches.containsKey(id);
-  }
-
-  public void addResultMap(ResultMap rm) {
-    resultMaps.put(rm.getId(), rm);
-    checkLocallyForDiscriminatedNestedResultMaps(rm);
-    checkGloballyForDiscriminatedNestedResultMaps(rm);
-  }
-
-  public Collection<String> getResultMapNames() {
-    return resultMaps.keySet();
-  }
-
-  public Collection<ResultMap> getResultMaps() {
-    return resultMaps.values();
-  }
-
-  public ResultMap getResultMap(String id) {
-    return resultMaps.get(id);
-  }
-
-  public boolean hasResultMap(String id) {
-    return resultMaps.containsKey(id);
-  }
-
-  public void addParameterMap(ParameterMap pm) {
-    parameterMaps.put(pm.getId(), pm);
-  }
-
-  public Collection<String> getParameterMapNames() {
-    return parameterMaps.keySet();
-  }
-
-  public Collection<ParameterMap> getParameterMaps() {
-    return parameterMaps.values();
-  }
-
-  public ParameterMap getParameterMap(String id) {
-    return parameterMaps.get(id);
-  }
-
-  public boolean hasParameterMap(String id) {
-    return parameterMaps.containsKey(id);
-  }
-
-  public void addMappedStatement(MappedStatement ms) {
-    mappedStatements.put(ms.getId(), ms);
-  }
-
-  public Collection<String> getMappedStatementNames() {
-    buildAllStatements();
-    return mappedStatements.keySet();
-  }
-
-  public Collection<MappedStatement> getMappedStatements() {
-    buildAllStatements();
-    return mappedStatements.values();
-  }
-
-  public Collection<XMLStatementBuilder> getIncompleteStatements() {
-    return incompleteStatements;
-  }
-
-  public void addIncompleteStatement(XMLStatementBuilder incompleteStatement) {
-    incompleteStatements.add(incompleteStatement);
-  }
-
-  public Collection<CacheRefResolver> getIncompleteCacheRefs() {
-    return incompleteCacheRefs;
-  }
-
-  public void addIncompleteCacheRef(CacheRefResolver incompleteCacheRef) {
-    incompleteCacheRefs.add(incompleteCacheRef);
-  }
-
-  public Collection<ResultMapResolver> getIncompleteResultMaps() {
-    return incompleteResultMaps;
-  }
-
-  public void addIncompleteResultMap(ResultMapResolver resultMapResolver) {
-    incompleteResultMaps.add(resultMapResolver);
-  }
-
-  public void addIncompleteMethod(MethodResolver builder) {
-    incompleteMethods.add(builder);
-  }
-
-  public Collection<MethodResolver> getIncompleteMethods() {
-    return incompleteMethods;
-  }
-
-  public MappedStatement getMappedStatement(String id) {
-    return this.getMappedStatement(id, true);
-  }
-
-  public MappedStatement getMappedStatement(String id, boolean validateIncompleteStatements) {
-    if (validateIncompleteStatements) {
-      buildAllStatements();
-    }
-    return mappedStatements.get(id);
-  }
-
-  public Map<String, XNode> getSqlFragments() {
-    return sqlFragments;
-  }
-
-  public void addInterceptor(Interceptor interceptor) {
-    interceptorChain.addInterceptor(interceptor);
-  }
-
-  public void addMappers(String packageName, Class<?> superType) {
-    mapperRegistry.addMappers(packageName, superType);
-  }
-
-  public void addMappers(String packageName) {
-    mapperRegistry.addMappers(packageName);
-  }
-
-  public <T> void addMapper(Class<T> type) {
-    mapperRegistry.addMapper(type);
-  }
-
-  public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
-    return mapperRegistry.getMapper(type, sqlSession);
-  }
-
-  public boolean hasMapper(Class<?> type) {
-    return mapperRegistry.hasMapper(type);
-  }
-
-  public boolean hasStatement(String statementName) {
-    return hasStatement(statementName, true);
-  }
-
-  public boolean hasStatement(String statementName, boolean validateIncompleteStatements) {
-    if (validateIncompleteStatements) {
-      buildAllStatements();
-    }
-    return mappedStatements.containsKey(statementName);
-  }
-
-  public void addCacheRef(String namespace, String referencedNamespace) {
-    cacheRefMap.put(namespace, referencedNamespace);
-  }
-
-  /*
-   * Parses all the unprocessed statement nodes in the cache. It is recommended
-   * to call this method once all the mappers are added as it provides fail-fast
-   * statement validation.
-   */
-  protected void buildAllStatements() {
-    if (!incompleteResultMaps.isEmpty()) {
-      synchronized (incompleteResultMaps) {
-        // This always throws a BuilderException.
-        incompleteResultMaps.iterator().next().resolve();
-      }
-    }
-    if (!incompleteCacheRefs.isEmpty()) {
-      synchronized (incompleteCacheRefs) {
-        // This always throws a BuilderException.
-        incompleteCacheRefs.iterator().next().resolveCacheRef();
-      }
-    }
-    if (!incompleteStatements.isEmpty()) {
-      synchronized (incompleteStatements) {
-        // This always throws a BuilderException.
-        incompleteStatements.iterator().next().parseStatementNode();
-      }
-    }
-    if (!incompleteMethods.isEmpty()) {
-      synchronized (incompleteMethods) {
-        // This always throws a BuilderException.
-        incompleteMethods.iterator().next().resolve();
-      }
-    }
-  }
-
-  /*
-   * Extracts namespace from fully qualified statement id.
-   *
-   * @param statementId
-   * @return namespace or null when id does not contain period.
-   */
-  protected String extractNamespace(String statementId) {
-    int lastPeriod = statementId.lastIndexOf('.');
-    return lastPeriod > 0 ? statementId.substring(0, lastPeriod) : null;
-  }
-
-  // Slow but a one time cost. A better solution is welcome.
-  protected void checkGloballyForDiscriminatedNestedResultMaps(ResultMap rm) {
-    if (rm.hasNestedResultMaps()) {
-      for (Map.Entry<String, ResultMap> entry : resultMaps.entrySet()) {
-        Object value = entry.getValue();
-        if (value instanceof ResultMap) {
-          ResultMap entryResultMap = (ResultMap) value;
-          if (!entryResultMap.hasNestedResultMaps() && entryResultMap.getDiscriminator() != null) {
-            Collection<String> discriminatedResultMapNames = entryResultMap.getDiscriminator().getDiscriminatorMap().values();
-            if (discriminatedResultMapNames.contains(rm.getId())) {
-              entryResultMap.forceNestedResultMaps();
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Slow but a one time cost. A better solution is welcome.
-  protected void checkLocallyForDiscriminatedNestedResultMaps(ResultMap rm) {
-    if (!rm.hasNestedResultMaps() && rm.getDiscriminator() != null) {
-      for (Map.Entry<String, String> entry : rm.getDiscriminator().getDiscriminatorMap().entrySet()) {
-        String discriminatedResultMapName = entry.getValue();
-        if (hasResultMap(discriminatedResultMapName)) {
-          ResultMap discriminatedResultMap = resultMaps.get(discriminatedResultMapName);
-          if (discriminatedResultMap.hasNestedResultMaps()) {
-            rm.forceNestedResultMaps();
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  protected static class StrictMap<V> extends HashMap<String, V> {
-
-    private static final long serialVersionUID = -4950446264854982944L;
-    private String name;
-
-    public StrictMap(String name, int initialCapacity, float loadFactor) {
-      super(initialCapacity, loadFactor);
-      this.name = name;
-    }
-
-    public StrictMap(String name, int initialCapacity) {
-      super(initialCapacity);
-      this.name = name;
-    }
-
-    public StrictMap(String name) {
-      super();
-      this.name = name;
-    }
-
-    public StrictMap(String name, Map<String, ? extends V> m) {
-      super(m);
-      this.name = name;
-    }
-
-    @SuppressWarnings("unchecked")
-    public V put(String key, V value) {
-      if (containsKey(key))
-        throw new IllegalArgumentException(name + " already contains value for " + key);
-      if (key.contains(".")) {
-        final String shortKey = getShortName(key);
-        if (super.get(shortKey) == null) {
-          super.put(shortKey, value);
-        } else {
-          super.put(shortKey, (V) new Ambiguity(shortKey));
-        }
-      }
-      return super.put(key, value);
-    }
-
-    public V get(Object key) {
-      V value = super.get(key);
-      if (value == null) {
-        throw new IllegalArgumentException(name + " does not contain value for " + key);
-      }
-      if (value instanceof Ambiguity) {
-        throw new IllegalArgumentException(((Ambiguity) value).getSubject() + " is ambiguous in " + name
-            + " (try using the full name including the namespace, or rename one of the entries)");
-      }
-      return value;
-    }
-
-    private String getShortName(String key) {
-      final String[] keyparts = key.split("\\.");
-      final String shortKey = keyparts[keyparts.length - 1];
-      return shortKey;
-    }
-
-    protected static class Ambiguity {
-      private String subject;
-
-      public Ambiguity(String subject) {
-        this.subject = subject;
-      }
-
-      public String getSubject() {
-        return subject;
-      }
-    }
-  }
+	protected Environment environment;
+
+	protected boolean safeRowBoundsEnabled = false;
+	protected boolean safeResultHandlerEnabled = true;
+	protected boolean mapUnderscoreToCamelCase = false;
+	protected boolean aggressiveLazyLoading = true;
+	protected boolean multipleResultSetsEnabled = true;
+	protected boolean useGeneratedKeys = false;
+	protected boolean useColumnLabel = true;
+	/**
+	 * 是否启用缓存，默认为 true 启用。
+	 */
+	protected boolean cacheEnabled = true;
+	protected boolean callSettersOnNulls = false;
+	protected String logPrefix;
+	protected Class<? extends Log> logImpl;
+	protected LocalCacheScope localCacheScope = LocalCacheScope.SESSION;
+	protected JdbcType jdbcTypeForNull = JdbcType.OTHER;
+	protected Set<String> lazyLoadTriggerMethods = new HashSet<String>(Arrays.asList(new String[] { "equals", "clone", "hashCode",
+			"toString" }));
+	protected Integer defaultStatementTimeout;
+	/**
+	 * {@link Executor} 默认的执行方式：{@link ExecutorType#SIMPLE}。
+	 */
+	protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;
+	protected AutoMappingBehavior autoMappingBehavior = AutoMappingBehavior.PARTIAL;
+
+	protected Properties variables = new Properties();
+	protected ObjectFactory objectFactory = new DefaultObjectFactory();
+	protected ObjectWrapperFactory objectWrapperFactory = new DefaultObjectWrapperFactory();
+	protected MapperRegistry mapperRegistry = new MapperRegistry(this);
+
+	protected boolean lazyLoadingEnabled = false;
+	protected ProxyFactory proxyFactory;
+
+	protected String databaseId;
+	/**
+	 * Configuration factory class. Used to create Configuration for loading deserialized unread properties.
+	 * 
+	 * @see <a href='https://code.google.com/p/mybatis/issues/detail?id=300'>Issue 300</a> (google code)
+	 */
+	protected Class<?> configurationFactory;
+
+	protected final InterceptorChain interceptorChain = new InterceptorChain();
+	protected final TypeHandlerRegistry typeHandlerRegistry = new TypeHandlerRegistry();
+	protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
+	protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
+
+	protected final Map<String, MappedStatement> mappedStatements = new StrictMap<MappedStatement>("Mapped Statements collection");
+	protected final Map<String, Cache> caches = new StrictMap<Cache>("Caches collection");
+	protected final Map<String, ResultMap> resultMaps = new StrictMap<ResultMap>("Result Maps collection");
+	protected final Map<String, ParameterMap> parameterMaps = new StrictMap<ParameterMap>("Parameter Maps collection");
+	protected final Map<String, KeyGenerator> keyGenerators = new StrictMap<KeyGenerator>("Key Generators collection");
+
+	protected final Set<String> loadedResources = new HashSet<String>();
+	protected final Map<String, XNode> sqlFragments = new StrictMap<XNode>("XML fragments parsed from previous mappers");
+
+	protected final Collection<XMLStatementBuilder> incompleteStatements = new LinkedList<XMLStatementBuilder>();
+	protected final Collection<CacheRefResolver> incompleteCacheRefs = new LinkedList<CacheRefResolver>();
+	protected final Collection<ResultMapResolver> incompleteResultMaps = new LinkedList<ResultMapResolver>();
+	protected final Collection<MethodResolver> incompleteMethods = new LinkedList<MethodResolver>();
+
+	/*
+	 * A map holds cache-ref relationship. The key is the namespace that references a cache bound to another namespace and the value is the
+	 * namespace which the actual cache is bound to.
+	 */
+	protected final Map<String, String> cacheRefMap = new HashMap<String, String>();
+
+	public Configuration(Environment environment) {
+		this();
+		this.environment = environment;
+	}
+
+	public Configuration() {
+		typeAliasRegistry.registerAlias("JDBC", JdbcTransactionFactory.class);
+		typeAliasRegistry.registerAlias("MANAGED", ManagedTransactionFactory.class);
+
+		typeAliasRegistry.registerAlias("JNDI", JndiDataSourceFactory.class);
+		typeAliasRegistry.registerAlias("POOLED", PooledDataSourceFactory.class);
+		typeAliasRegistry.registerAlias("UNPOOLED", UnpooledDataSourceFactory.class);
+
+		typeAliasRegistry.registerAlias("PERPETUAL", PerpetualCache.class);
+		typeAliasRegistry.registerAlias("FIFO", FifoCache.class);
+		typeAliasRegistry.registerAlias("LRU", LruCache.class);
+		typeAliasRegistry.registerAlias("SOFT", SoftCache.class);
+		typeAliasRegistry.registerAlias("WEAK", WeakCache.class);
+
+		typeAliasRegistry.registerAlias("DB_VENDOR", VendorDatabaseIdProvider.class);
+
+		typeAliasRegistry.registerAlias("XML", XMLLanguageDriver.class);
+		typeAliasRegistry.registerAlias("RAW", RawLanguageDriver.class);
+
+		typeAliasRegistry.registerAlias("SLF4J", Slf4jImpl.class);
+		typeAliasRegistry.registerAlias("COMMONS_LOGGING", JakartaCommonsLoggingImpl.class);
+		typeAliasRegistry.registerAlias("LOG4J", Log4jImpl.class);
+		typeAliasRegistry.registerAlias("LOG4J2", Log4j2Impl.class);
+		typeAliasRegistry.registerAlias("JDK_LOGGING", Jdk14LoggingImpl.class);
+		typeAliasRegistry.registerAlias("STDOUT_LOGGING", StdOutImpl.class);
+		typeAliasRegistry.registerAlias("NO_LOGGING", NoLoggingImpl.class);
+
+		typeAliasRegistry.registerAlias("CGLIB", CglibProxyFactory.class);
+		typeAliasRegistry.registerAlias("JAVASSIST", JavassistProxyFactory.class);
+
+		languageRegistry.setDefaultDriverClass(XMLLanguageDriver.class);
+		languageRegistry.register(RawLanguageDriver.class);
+	}
+
+	public String getLogPrefix() {
+		return logPrefix;
+	}
+
+	public void setLogPrefix(String logPrefix) {
+		this.logPrefix = logPrefix;
+	}
+
+	public Class<? extends Log> getLogImpl() {
+		return logImpl;
+	}
+
+	@SuppressWarnings("unchecked")
+	public void setLogImpl(Class<?> logImpl) {
+		if (logImpl != null) {
+			this.logImpl = (Class<? extends Log>) logImpl;
+			LogFactory.useCustomLogging(this.logImpl);
+		}
+	}
+
+	public boolean isCallSettersOnNulls() {
+		return callSettersOnNulls;
+	}
+
+	public void setCallSettersOnNulls(boolean callSettersOnNulls) {
+		this.callSettersOnNulls = callSettersOnNulls;
+	}
+
+	public String getDatabaseId() {
+		return databaseId;
+	}
+
+	public void setDatabaseId(String databaseId) {
+		this.databaseId = databaseId;
+	}
+
+	public Class<?> getConfigurationFactory() {
+		return configurationFactory;
+	}
+
+	public void setConfigurationFactory(Class<?> configurationFactory) {
+		this.configurationFactory = configurationFactory;
+	}
+
+	public boolean isSafeResultHandlerEnabled() {
+		return safeResultHandlerEnabled;
+	}
+
+	public void setSafeResultHandlerEnabled(boolean safeResultHandlerEnabled) {
+		this.safeResultHandlerEnabled = safeResultHandlerEnabled;
+	}
+
+	public boolean isSafeRowBoundsEnabled() {
+		return safeRowBoundsEnabled;
+	}
+
+	public void setSafeRowBoundsEnabled(boolean safeRowBoundsEnabled) {
+		this.safeRowBoundsEnabled = safeRowBoundsEnabled;
+	}
+
+	public boolean isMapUnderscoreToCamelCase() {
+		return mapUnderscoreToCamelCase;
+	}
+
+	public void setMapUnderscoreToCamelCase(boolean mapUnderscoreToCamelCase) {
+		this.mapUnderscoreToCamelCase = mapUnderscoreToCamelCase;
+	}
+
+	public void addLoadedResource(String resource) {
+		loadedResources.add(resource);
+	}
+
+	public boolean isResourceLoaded(String resource) {
+		return loadedResources.contains(resource);
+	}
+
+	public Environment getEnvironment() {
+		return environment;
+	}
+
+	public void setEnvironment(Environment environment) {
+		this.environment = environment;
+	}
+
+	public AutoMappingBehavior getAutoMappingBehavior() {
+		return autoMappingBehavior;
+	}
+
+	public void setAutoMappingBehavior(AutoMappingBehavior autoMappingBehavior) {
+		this.autoMappingBehavior = autoMappingBehavior;
+	}
+
+	public boolean isLazyLoadingEnabled() {
+		return lazyLoadingEnabled;
+	}
+
+	public void setLazyLoadingEnabled(boolean lazyLoadingEnabled) {
+		this.lazyLoadingEnabled = lazyLoadingEnabled;
+	}
+
+	public ProxyFactory getProxyFactory() {
+		if (proxyFactory == null) {
+			// makes sure CGLIB is not needed unless explicitly requested
+			proxyFactory = new CglibProxyFactory();
+		}
+		return proxyFactory;
+	}
+
+	public void setProxyFactory(ProxyFactory proxyFactory) {
+		this.proxyFactory = proxyFactory;
+	}
+
+	public boolean isAggressiveLazyLoading() {
+		return aggressiveLazyLoading;
+	}
+
+	public void setAggressiveLazyLoading(boolean aggressiveLazyLoading) {
+		this.aggressiveLazyLoading = aggressiveLazyLoading;
+	}
+
+	public boolean isMultipleResultSetsEnabled() {
+		return multipleResultSetsEnabled;
+	}
+
+	public void setMultipleResultSetsEnabled(boolean multipleResultSetsEnabled) {
+		this.multipleResultSetsEnabled = multipleResultSetsEnabled;
+	}
+
+	public Set<String> getLazyLoadTriggerMethods() {
+		return lazyLoadTriggerMethods;
+	}
+
+	public void setLazyLoadTriggerMethods(Set<String> lazyLoadTriggerMethods) {
+		this.lazyLoadTriggerMethods = lazyLoadTriggerMethods;
+	}
+
+	public boolean isUseGeneratedKeys() {
+		return useGeneratedKeys;
+	}
+
+	public void setUseGeneratedKeys(boolean useGeneratedKeys) {
+		this.useGeneratedKeys = useGeneratedKeys;
+	}
+
+	public ExecutorType getDefaultExecutorType() {
+		return defaultExecutorType;
+	}
+
+	public void setDefaultExecutorType(ExecutorType defaultExecutorType) {
+		this.defaultExecutorType = defaultExecutorType;
+	}
+
+	public boolean isCacheEnabled() {
+		return cacheEnabled;
+	}
+
+	public void setCacheEnabled(boolean cacheEnabled) {
+		this.cacheEnabled = cacheEnabled;
+	}
+
+	public Integer getDefaultStatementTimeout() {
+		return defaultStatementTimeout;
+	}
+
+	public void setDefaultStatementTimeout(Integer defaultStatementTimeout) {
+		this.defaultStatementTimeout = defaultStatementTimeout;
+	}
+
+	public boolean isUseColumnLabel() {
+		return useColumnLabel;
+	}
+
+	public void setUseColumnLabel(boolean useColumnLabel) {
+		this.useColumnLabel = useColumnLabel;
+	}
+
+	public LocalCacheScope getLocalCacheScope() {
+		return localCacheScope;
+	}
+
+	public void setLocalCacheScope(LocalCacheScope localCacheScope) {
+		this.localCacheScope = localCacheScope;
+	}
+
+	public JdbcType getJdbcTypeForNull() {
+		return jdbcTypeForNull;
+	}
+
+	public void setJdbcTypeForNull(JdbcType jdbcTypeForNull) {
+		this.jdbcTypeForNull = jdbcTypeForNull;
+	}
+
+	public Properties getVariables() {
+		return variables;
+	}
+
+	public void setVariables(Properties variables) {
+		this.variables = variables;
+	}
+
+	public TypeHandlerRegistry getTypeHandlerRegistry() {
+		return typeHandlerRegistry;
+	}
+
+	public TypeAliasRegistry getTypeAliasRegistry() {
+		return typeAliasRegistry;
+	}
+
+	/**
+	 * @since 3.2.2
+	 */
+	public MapperRegistry getMapperRegistry() {
+		return mapperRegistry;
+	}
+
+	public ObjectFactory getObjectFactory() {
+		return objectFactory;
+	}
+
+	public void setObjectFactory(ObjectFactory objectFactory) {
+		this.objectFactory = objectFactory;
+	}
+
+	public ObjectWrapperFactory getObjectWrapperFactory() {
+		return objectWrapperFactory;
+	}
+
+	public void setObjectWrapperFactory(ObjectWrapperFactory objectWrapperFactory) {
+		this.objectWrapperFactory = objectWrapperFactory;
+	}
+
+	/**
+	 * @since 3.2.2
+	 */
+	public List<Interceptor> getInterceptors() {
+		return interceptorChain.getInterceptors();
+	}
+
+	public LanguageDriverRegistry getLanguageRegistry() {
+		return languageRegistry;
+	}
+
+	public void setDefaultScriptingLanguage(Class<?> driver) {
+		if (driver == null) {
+			driver = XMLLanguageDriver.class;
+		}
+		getLanguageRegistry().setDefaultDriverClass(driver);
+	}
+
+	public LanguageDriver getDefaultScriptingLanuageInstance() {
+		return languageRegistry.getDefaultDriver();
+	}
+
+	public MetaObject newMetaObject(Object object) {
+		return MetaObject.forObject(object, objectFactory, objectWrapperFactory);
+	}
+
+	public ParameterHandler newParameterHandler(MappedStatement mappedStatement, Object parameterObject, BoundSql boundSql) {
+		ParameterHandler parameterHandler = mappedStatement.getLang().createParameterHandler(mappedStatement, parameterObject, boundSql);
+		parameterHandler = (ParameterHandler) interceptorChain.pluginAll(parameterHandler);
+		return parameterHandler;
+	}
+
+	public ResultSetHandler newResultSetHandler(Executor executor, MappedStatement mappedStatement, RowBounds rowBounds,
+			ParameterHandler parameterHandler, ResultHandler resultHandler, BoundSql boundSql) {
+		ResultSetHandler resultSetHandler = new DefaultResultSetHandler(executor, mappedStatement, parameterHandler, resultHandler,
+				boundSql, rowBounds);
+		resultSetHandler = (ResultSetHandler) interceptorChain.pluginAll(resultSetHandler);
+		return resultSetHandler;
+	}
+
+	public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject,
+			RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
+		StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds,
+				resultHandler, boundSql);
+		statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
+		return statementHandler;
+	}
+
+	public Executor newExecutor(Transaction transaction) {
+		return newExecutor(transaction, defaultExecutorType);
+	}
+
+	/**
+	 * <h3>创建执行器 Executor</h3>
+	 * <ol>
+	 * <li>根据参数 executorType 所代表不同的执行方式，创建不同类型的、使用了参数 transaction 的执行器。{@link ExecutorType#BATCH} 使用 {@link BatchExecutor} 执行器，
+	 * {@link ExecutorType#REUSE} 使用 {@link ReuseExecutor} 执行器，否则其它的为 {@link ExecutorType#SIMPLE} 使用 {@link SimpleExecutor} 执行器。</li>
+	 * <li>如果启用缓存，使用缓存执行器包装上一步的执行器 {@link CachingExecutor} 。</li>
+	 * <li>拦截器层层次次地包装上一步的执行器。使用了动态代理技术。</li>
+	 * </ol>
+	 * 
+	 * @param transaction
+	 * @param executorType
+	 * @return
+	 */
+	public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
+		// 保证 executorType 不为 null 。首先考虑传入 executorType ，否则考虑本类定义的 defaultExecutorType ，最后给定写死的 ExecutorType.SIMPLE 。
+		executorType = executorType == null ? defaultExecutorType : executorType;
+		executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
+
+		Executor executor;
+		if (ExecutorType.BATCH == executorType) {
+			// 批量 SQL 操作。主要是使用 JDBC 的批量操作，所以具体要求和效果参考相关数据的 API 。
+			executor = new BatchExecutor(this, transaction);
+		} else if (ExecutorType.REUSE == executorType) {
+			// 重用Statement 执行 SQL 操作。
+			executor = new ReuseExecutor(this, transaction);
+		} else {
+			// 简单执行 SQL 。
+			executor = new SimpleExecutor(this, transaction);
+		}
+		if (cacheEnabled) {
+			// 启用缓存。
+			executor = new CachingExecutor(executor);
+		}
+		// 这个 interceptorChain 对象在 MyBatis 初始化的时候被创建，它保存了所有的拦截器，并有序地组成了一条拦截器。
+		// 这句代码的含义是调用拦截器链里的每个拦截器依次对 executor 进行拦截。
+		executor = (Executor) interceptorChain.pluginAll(executor);
+		return executor;
+	}
+
+	public void addKeyGenerator(String id, KeyGenerator keyGenerator) {
+		keyGenerators.put(id, keyGenerator);
+	}
+
+	public Collection<String> getKeyGeneratorNames() {
+		return keyGenerators.keySet();
+	}
+
+	public Collection<KeyGenerator> getKeyGenerators() {
+		return keyGenerators.values();
+	}
+
+	public KeyGenerator getKeyGenerator(String id) {
+		return keyGenerators.get(id);
+	}
+
+	public boolean hasKeyGenerator(String id) {
+		return keyGenerators.containsKey(id);
+	}
+
+	public void addCache(Cache cache) {
+		caches.put(cache.getId(), cache);
+	}
+
+	public Collection<String> getCacheNames() {
+		return caches.keySet();
+	}
+
+	public Collection<Cache> getCaches() {
+		return caches.values();
+	}
+
+	public Cache getCache(String id) {
+		return caches.get(id);
+	}
+
+	public boolean hasCache(String id) {
+		return caches.containsKey(id);
+	}
+
+	public void addResultMap(ResultMap rm) {
+		resultMaps.put(rm.getId(), rm);
+		checkLocallyForDiscriminatedNestedResultMaps(rm);
+		checkGloballyForDiscriminatedNestedResultMaps(rm);
+	}
+
+	public Collection<String> getResultMapNames() {
+		return resultMaps.keySet();
+	}
+
+	public Collection<ResultMap> getResultMaps() {
+		return resultMaps.values();
+	}
+
+	public ResultMap getResultMap(String id) {
+		return resultMaps.get(id);
+	}
+
+	public boolean hasResultMap(String id) {
+		return resultMaps.containsKey(id);
+	}
+
+	public void addParameterMap(ParameterMap pm) {
+		parameterMaps.put(pm.getId(), pm);
+	}
+
+	public Collection<String> getParameterMapNames() {
+		return parameterMaps.keySet();
+	}
+
+	public Collection<ParameterMap> getParameterMaps() {
+		return parameterMaps.values();
+	}
+
+	public ParameterMap getParameterMap(String id) {
+		return parameterMaps.get(id);
+	}
+
+	public boolean hasParameterMap(String id) {
+		return parameterMaps.containsKey(id);
+	}
+
+	public void addMappedStatement(MappedStatement ms) {
+		mappedStatements.put(ms.getId(), ms);
+	}
+
+	public Collection<String> getMappedStatementNames() {
+		buildAllStatements();
+		return mappedStatements.keySet();
+	}
+
+	public Collection<MappedStatement> getMappedStatements() {
+		buildAllStatements();
+		return mappedStatements.values();
+	}
+
+	public Collection<XMLStatementBuilder> getIncompleteStatements() {
+		return incompleteStatements;
+	}
+
+	public void addIncompleteStatement(XMLStatementBuilder incompleteStatement) {
+		incompleteStatements.add(incompleteStatement);
+	}
+
+	public Collection<CacheRefResolver> getIncompleteCacheRefs() {
+		return incompleteCacheRefs;
+	}
+
+	public void addIncompleteCacheRef(CacheRefResolver incompleteCacheRef) {
+		incompleteCacheRefs.add(incompleteCacheRef);
+	}
+
+	public Collection<ResultMapResolver> getIncompleteResultMaps() {
+		return incompleteResultMaps;
+	}
+
+	public void addIncompleteResultMap(ResultMapResolver resultMapResolver) {
+		incompleteResultMaps.add(resultMapResolver);
+	}
+
+	public void addIncompleteMethod(MethodResolver builder) {
+		incompleteMethods.add(builder);
+	}
+
+	public Collection<MethodResolver> getIncompleteMethods() {
+		return incompleteMethods;
+	}
+
+	public MappedStatement getMappedStatement(String id) {
+		return this.getMappedStatement(id, true);
+	}
+
+	public MappedStatement getMappedStatement(String id, boolean validateIncompleteStatements) {
+		if (validateIncompleteStatements) {
+			buildAllStatements();
+		}
+		return mappedStatements.get(id);
+	}
+
+	public Map<String, XNode> getSqlFragments() {
+		return sqlFragments;
+	}
+
+	public void addInterceptor(Interceptor interceptor) {
+		interceptorChain.addInterceptor(interceptor);
+	}
+
+	public void addMappers(String packageName, Class<?> superType) {
+		mapperRegistry.addMappers(packageName, superType);
+	}
+
+	public void addMappers(String packageName) {
+		mapperRegistry.addMappers(packageName);
+	}
+
+	public <T> void addMapper(Class<T> type) {
+		mapperRegistry.addMapper(type);
+	}
+
+	/**
+	 * <p>
+	 * 传递所有参数，由 {@link MapperRegistry#getMapper(Class, SqlSession)} 处理。
+	 * </p>
+	 * 
+	 * @param type
+	 * @param sqlSession
+	 * @return
+	 */
+	public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
+		return mapperRegistry.getMapper(type, sqlSession);
+	}
+
+	public boolean hasMapper(Class<?> type) {
+		return mapperRegistry.hasMapper(type);
+	}
+
+	public boolean hasStatement(String statementName) {
+		return hasStatement(statementName, true);
+	}
+
+	public boolean hasStatement(String statementName, boolean validateIncompleteStatements) {
+		if (validateIncompleteStatements) {
+			buildAllStatements();
+		}
+		return mappedStatements.containsKey(statementName);
+	}
+
+	public void addCacheRef(String namespace, String referencedNamespace) {
+		cacheRefMap.put(namespace, referencedNamespace);
+	}
+
+	/*
+	 * Parses all the unprocessed statement nodes in the cache. It is recommended to call this method once all the mappers are added as it
+	 * provides fail-fast statement validation.
+	 */
+	protected void buildAllStatements() {
+		if (!incompleteResultMaps.isEmpty()) {
+			synchronized (incompleteResultMaps) {
+				// This always throws a BuilderException.
+				incompleteResultMaps.iterator().next().resolve();
+			}
+		}
+		if (!incompleteCacheRefs.isEmpty()) {
+			synchronized (incompleteCacheRefs) {
+				// This always throws a BuilderException.
+				incompleteCacheRefs.iterator().next().resolveCacheRef();
+			}
+		}
+		if (!incompleteStatements.isEmpty()) {
+			synchronized (incompleteStatements) {
+				// This always throws a BuilderException.
+				incompleteStatements.iterator().next().parseStatementNode();
+			}
+		}
+		if (!incompleteMethods.isEmpty()) {
+			synchronized (incompleteMethods) {
+				// This always throws a BuilderException.
+				incompleteMethods.iterator().next().resolve();
+			}
+		}
+	}
+
+	/*
+	 * Extracts namespace from fully qualified statement id.
+	 * 
+	 * @param statementId
+	 * 
+	 * @return namespace or null when id does not contain period.
+	 */
+	protected String extractNamespace(String statementId) {
+		int lastPeriod = statementId.lastIndexOf('.');
+		return lastPeriod > 0 ? statementId.substring(0, lastPeriod) : null;
+	}
+
+	// Slow but a one time cost. A better solution is welcome.
+	protected void checkGloballyForDiscriminatedNestedResultMaps(ResultMap rm) {
+		if (rm.hasNestedResultMaps()) {
+			for (Map.Entry<String, ResultMap> entry : resultMaps.entrySet()) {
+				Object value = entry.getValue();
+				if (value instanceof ResultMap) {
+					ResultMap entryResultMap = (ResultMap) value;
+					if (!entryResultMap.hasNestedResultMaps() && entryResultMap.getDiscriminator() != null) {
+						Collection<String> discriminatedResultMapNames = entryResultMap.getDiscriminator().getDiscriminatorMap().values();
+						if (discriminatedResultMapNames.contains(rm.getId())) {
+							entryResultMap.forceNestedResultMaps();
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Slow but a one time cost. A better solution is welcome.
+	protected void checkLocallyForDiscriminatedNestedResultMaps(ResultMap rm) {
+		if (!rm.hasNestedResultMaps() && rm.getDiscriminator() != null) {
+			for (Map.Entry<String, String> entry : rm.getDiscriminator().getDiscriminatorMap().entrySet()) {
+				String discriminatedResultMapName = entry.getValue();
+				if (hasResultMap(discriminatedResultMapName)) {
+					ResultMap discriminatedResultMap = resultMaps.get(discriminatedResultMapName);
+					if (discriminatedResultMap.hasNestedResultMaps()) {
+						rm.forceNestedResultMaps();
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	protected static class StrictMap<V> extends HashMap<String, V> {
+
+		private static final long serialVersionUID = -4950446264854982944L;
+		private String name;
+
+		public StrictMap(String name, int initialCapacity, float loadFactor) {
+			super(initialCapacity, loadFactor);
+			this.name = name;
+		}
+
+		public StrictMap(String name, int initialCapacity) {
+			super(initialCapacity);
+			this.name = name;
+		}
+
+		public StrictMap(String name) {
+			super();
+			this.name = name;
+		}
+
+		public StrictMap(String name, Map<String, ? extends V> m) {
+			super(m);
+			this.name = name;
+		}
+
+		@SuppressWarnings("unchecked")
+		public V put(String key, V value) {
+			if (containsKey(key))
+				throw new IllegalArgumentException(name + " already contains value for " + key);
+			if (key.contains(".")) {
+				final String shortKey = getShortName(key);
+				if (super.get(shortKey) == null) {
+					super.put(shortKey, value);
+				} else {
+					super.put(shortKey, (V) new Ambiguity(shortKey));
+				}
+			}
+			return super.put(key, value);
+		}
+
+		public V get(Object key) {
+			V value = super.get(key);
+			if (value == null) {
+				throw new IllegalArgumentException(name + " does not contain value for " + key);
+			}
+			if (value instanceof Ambiguity) {
+				throw new IllegalArgumentException(((Ambiguity) value).getSubject() + " is ambiguous in " + name
+						+ " (try using the full name including the namespace, or rename one of the entries)");
+			}
+			return value;
+		}
+
+		private String getShortName(String key) {
+			final String[] keyparts = key.split("\\.");
+			final String shortKey = keyparts[keyparts.length - 1];
+			return shortKey;
+		}
+
+		protected static class Ambiguity {
+			private String subject;
+
+			public Ambiguity(String subject) {
+				this.subject = subject;
+			}
+
+			public String getSubject() {
+				return subject;
+			}
+		}
+	}
 
 }

@@ -73,27 +73,27 @@ public interface SqlSessionFactory {
 
 	/**
 	 * <h3>创建 SqlSession</h3>
-	 * <p>根据数据隔离级别获取一个 {@link SqlSession} ，参考其默认的实现
+	 * <p>根据数据隔离级别 {@link TransactionIsolationLevel} 获取一个 {@link SqlSession} ，参考其默认的实现
 	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession(TransactionIsolationLevel) DefaultSqlSessionFactory.openSession(TransactionIsolationLevel)}</p>
-	 * @param level 数据隔离级别，  {@link TransactionIsolationLevel} 类型。
+	 * @param level 数据隔离级别。
 	 * @return {@link SqlSession} 
 	 */
 	SqlSession openSession(TransactionIsolationLevel level);
 
 	/**
 	 * <h3>创建 SqlSession</h3>
-	 * <p>>根据 ..  获取一个 {@link SqlSession} ，参考其默认的实现
-	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession()}</p>
-	 * @param execType
+	 * <p>根据执行器的执行方式 {@link ExecutorType} 获取一个 {@link SqlSession} ，参考其默认的实现
+	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession(ExecutorType)}</p>
+	 * @param execType 执行器的执行。
 	 * @return  {@link SqlSession}
 	 */
 	SqlSession openSession(ExecutorType execType);
 
 	/**
 	 * <h3>创建 SqlSession</h3>
-	 * <p>根据 .. 和是否支持自动提交获取一个 {@link SqlSession}，参考其默认的实现
-	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession()}</p>
-	 * @param execType
+	 * <p>根据执行器的执行方式 {@link ExecutorType} 和是否支持自动提交获取一个 {@link SqlSession}，参考其默认的实现
+	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession(ExecutorType, boolean)}</p>
+	 * @param execType 执行器的执行。
 	 * @param autoCommit 是否能自动提交， Boolean 类型， true 为支持， false 为不支持。
 	 * @return  {@link SqlSession}
 	 */
@@ -101,9 +101,9 @@ public interface SqlSessionFactory {
 
 	/**
 	 * <h3>创建 SqlSession</h3>
-	 * <p>根据 .. 和数据隔离级别获取一个 {@link SqlSession} ，参考其默认的实现
-	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession()}</p>
-	 * @param execType
+	 * <p>根据执行器的执行方式 {@link ExecutorType} 和数据隔离级别 {@link TransactionIsolationLevel} 获取一个 {@link SqlSession} ，参考其默认的实现
+	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession(ExecutorType, TransactionIsolationLevel)}</p>
+	 * @param execType 执行器的执行。
 	 * @param level 数据隔离级别，  {@link TransactionIsolationLevel} 类型。
 	 * @return {@link SqlSession} 
 	 */
@@ -112,9 +112,9 @@ public interface SqlSessionFactory {
 
 	/**
 	 * <h3>创建 SqlSession</h3>
-	 * <p>根据 .. 和数据库连接获取一个 {@link SqlSession} ，参考其默认的实现
-	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession()}</p>
-	 * @param execType
+	 * <p>根据执行器的执行方式 {@link ExecutorType} 和数据库连接获取一个 {@link SqlSession} ，参考其默认的实现
+	 *  {@link org.apache.ibatis.session.defaults.DefaultSqlSessionFactory#openSession() DefaultSqlSessionFactory.openSession(ExecutorType, Connection)}</p>
+	 * @param execType 执行器的执行。
 	 * @param connection 数据库连接， {@link Connection} 类型。
 	 * @return {@link SqlSession} 
 	 */

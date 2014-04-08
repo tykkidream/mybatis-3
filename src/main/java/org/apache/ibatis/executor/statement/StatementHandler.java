@@ -25,27 +25,28 @@ import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.session.ResultHandler;
 
 /**
+ * <h3>语句执行器</h3>
+ * <p>
+ * 执行语句（ execute statement ）的处理器，用于执行静态 SQL 语句并返回它所生成结果的对象。 
+ * （这句话抄自 JDK6 API 的中文文档中 java.sql.Statement 接口说明的第一行，由于底层和 JDBC 关系大，所以多参考其文档。）
+ * </p>
+ * 
  * @author Clinton Begin
  */
 public interface StatementHandler {
 
-  Statement prepare(Connection connection)
-      throws SQLException;
+	Statement prepare(Connection connection) throws SQLException;
 
-  void parameterize(Statement statement)
-      throws SQLException;
+	void parameterize(Statement statement) throws SQLException;
 
-  void batch(Statement statement)
-      throws SQLException;
+	void batch(Statement statement) throws SQLException;
 
-  int update(Statement statement)
-      throws SQLException;
+	int update(Statement statement) throws SQLException;
 
-  <E> List<E> query(Statement statement, ResultHandler resultHandler)
-      throws SQLException;
+	<E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException;
 
-  BoundSql getBoundSql();
+	BoundSql getBoundSql();
 
-  ParameterHandler getParameterHandler();
+	ParameterHandler getParameterHandler();
 
 }
