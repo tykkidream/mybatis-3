@@ -27,8 +27,10 @@ import org.apache.ibatis.session.ResultHandler;
 /**
  * <h3>语句执行器</h3>
  * <p>
- * 执行语句（ execute statement ）的处理器，用于执行静态 SQL 语句并返回它所生成结果的对象。 
- * （这句话抄自 JDK6 API 的中文文档中 java.sql.Statement 接口说明的第一行，由于底层和 JDBC 关系大，所以多参考其文档。）
+ * 执行语句（ execute statement ）的处理器。属于最底层，因为实现本接口需要直接使用 JDBC 。
+ * </p>
+ * <p>
+ * <i>用于执行静态 SQL 语句并返回它所生成结果的对象。（这句话抄自 JDK6 API 的中文文档中 java.sql.Statement 接口说明的第一行。）</i>
  * </p>
  * 
  * @author Clinton Begin

@@ -55,15 +55,17 @@ public class SimpleExecutor extends BaseExecutor {
 	 * <p>由于父类使用了模板方法模式，此方法正是延迟到子类中的步骤。</p>
 	 */
 	public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) throws SQLException {
+		// JDBC 的技术。
 		Statement stmt = null;
 		try {
 			// 获得 Configuration 。注意是从 MappedStatement 中获取的，这里却没有使用本类的父类 BaseExecutor 中的 Configuration 实例。
 			Configuration configuration = ms.getConfiguration();
-			// 获得语句执行器。
+			// 获得语句执行器。wrapper 是从父类 BaseExecutor 继承下来的，
 			StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler, boundSql);
-			//
+			// 获取 JDBC 技术的 Statement 对象。
 			stmt = prepareStatement(handler, ms.getStatementLog());
-			//
+			// 做完了上面的一些准备工作后，开始真正地执行查询。
+			// 可以发现，真正干活的不是 Executor ，而是 StatementHandler 。
 			return handler.<E> query(stmt, resultHandler);
 		} finally {
 			closeStatement(stmt);
@@ -75,7 +77,8 @@ public class SimpleExecutor extends BaseExecutor {
 	}
 
 	/**
-	 * <h3>筹备语句执行器</h3>
+	 * <h3>创建 JDBC 技术中的 Statement</h3>
+	 * <p></p>
 	 * @param handler
 	 * @param statementLog
 	 * @return
@@ -83,6 +86,7 @@ public class SimpleExecutor extends BaseExecutor {
 	 */
 	private Statement prepareStatement(StatementHandler handler, Log statementLog) throws SQLException {
 		Statement stmt;
+		// 获取数据库连接 java.sql.Connection 。
 		Connection connection = getConnection(statementLog);
 		stmt = handler.prepare(connection);
 		handler.parameterize(stmt);
