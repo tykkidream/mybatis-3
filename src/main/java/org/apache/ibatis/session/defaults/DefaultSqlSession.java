@@ -41,6 +41,12 @@ import org.apache.ibatis.session.SqlSession;
 public class DefaultSqlSession implements SqlSession {
 
 	private Configuration configuration;
+	
+	/**
+	 * <p>对于当前 DefaultSqlSession 来说，它是实际执行数据库操作的对象。所有的 select 、 selectOne 、selectList 、selectMap 、
+	 * insert 、 delete 、update 、commit 、rollback 和重载方法实际上都是使用它执行的。</p>
+	 * <p>所以，在这里的发现，真正干活的是 Executor 。注意仅是在这里而已，再往 Executor 里阅读源代码又能发现新的不同。</p>
+	 */
 	private Executor executor;
 
 	private boolean autoCommit;
@@ -105,7 +111,13 @@ public class DefaultSqlSession implements SqlSession {
 
 	public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {
 		try {
+			// statement 是 MyBatis 映射语句的 ID ，根据它找到对应的“映射语句对象”。
 			MappedStatement ms = configuration.getMappedStatement(statement);
+			// 执行查询。
+			// @ 1、传递要被执行的映射语句对象。
+			// @ 2、映射语句中使用的参数。
+			// @ 3、MyBatis 自身的内存分页参数。
+			// @ 4、
 			List<E> result = executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);
 			return result;
 		} catch (Exception e) {
@@ -239,23 +251,55 @@ public class DefaultSqlSession implements SqlSession {
 		return (!autoCommit && dirty) || force;
 	}
 
+	/**
+	 * <h3>根据（原）参数获得将被传递到映射语句中的参数</h3>
+	 * <p>
+	 * 如果用户传递过来的参数是 List 类型、 数组类型，就把它们包装在一个特别的 Map 中，各自的 Key 分别是 “list” 、“array”。
+	 * 否则，返回原参数本身。
+	 * </p>
+	 * @param object
+	 * @return
+	 */
 	private Object wrapCollection(final Object object) {
 		if (object instanceof List) {
+			// 和 HashMap 的区别只有一点，大部分场合用不上，这里也没有用上。
+			// 这个对象就是最终在映射文件里映射语句中的参数，暂且称为语句参数。
 			StrictMap<Object> map = new StrictMap<Object>();
+			// List 类型的参数，都是以 Key 为 “ list ”放在语句参数中的。
 			map.put("list", object);
 			return map;
 		} else if (object != null && object.getClass().isArray()) {
+			// 和 HashMap 的区别只有一点，大部分场合用不上，这里也没有用上。
+			// 这个对象就是最终在映射文件里映射语句中的参数，暂且称为语句参数。
 			StrictMap<Object> map = new StrictMap<Object>();
+			// 数组类型的参数，都是以 Key 为 “ array ”放在语句参数中的。
 			map.put("array", object);
 			return map;
 		}
+		// 参数不是 List 或 数组时，返回原参数。
 		return object;
 	}
 
+	/**
+	 * <h3>HashMap 而已</h3>
+	 * <p>
+	 * 	只是覆写了 HashMap 的 Get 方法，当 Key 不存在的抛出异常。
+	 * </p>
+	 * <p>
+	 * 使用的地方只是作为 MyBatis 的映射语句的参数。
+	 * 因此它的“当 Key 不存在的抛出异常”这个功能发挥作用在映射语句中，当 OGNL 获取不在 Key 的值而造成的 SQL 语句结构错误被提早发现。
+	 * </p>
+	 * @author l
+	 *
+	 * @param <V>
+	 */
 	public static class StrictMap<V> extends HashMap<String, V> {
 
 		private static final long serialVersionUID = -5741767162221585340L;
 
+		/**
+		 * 当 Key 不存在是，抛出 {@link BindingException} 异常。
+		 */
 		@Override
 		public V get(Object key) {
 			if (!super.containsKey(key)) {

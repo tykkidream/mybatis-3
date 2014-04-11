@@ -29,10 +29,10 @@ import org.apache.ibatis.scripting.LanguageDriver;
 import org.apache.ibatis.session.Configuration;
 
 /**
- * <h3>封装 MyBatis 映射文件中的一个 SQL 语句的配置信息</h3>
+ * <h3>封装 MyBatis 映射文件中的一个映射语句的配置信息</h3>
  * <p>
- * 封装 MyBatis 映射文件中的一个映射语句，包括 &lt;insert /&gt;、&lt;delete /&gt;、&lt;update /&gt;、&lt;select /&gt; 中所有的配置信息，
- * 还有执行的SQL语句，结果映射配置。
+ * 封装 MyBatis 映射文件中的一个映射语句，包括 &lt;insert /&gt;、&lt;delete /&gt;、&lt;update /&gt;、&lt;select /&gt; 的所有的信息，
+ * 包括配置信息、执行的 SQL 语句、结果映射配置。
  * </p>
  * 
  * @author Clinton Begin
