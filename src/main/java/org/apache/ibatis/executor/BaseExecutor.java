@@ -155,10 +155,10 @@ public abstract class BaseExecutor implements Executor {
 			// 
 			list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;
 			if (list != null) {
-				// 
+				// 这一步说明 list 有值，但这个值是从本地缓存中取得到的。
 				handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);
 			} else {
-				//
+				// 这一步说明 list 没值。
 				list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);
 			}
 		} finally {
