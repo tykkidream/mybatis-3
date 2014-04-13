@@ -115,7 +115,7 @@ public class DefaultSqlSession implements SqlSession {
 			MappedStatement ms = configuration.getMappedStatement(statement);
 			// 执行查询。
 			// @ 1、传递要被执行的映射语句对象。
-			// @ 2、映射语句中使用的参数。
+			// @ 2、特别地按照一些规则把 parameter 处理一下，使它能被用于映射语句中解析的参数。
 			// @ 3、MyBatis 自身的内存分页参数。
 			// @ 4、
 			List<E> result = executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);

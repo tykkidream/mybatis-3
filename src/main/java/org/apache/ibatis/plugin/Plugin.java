@@ -30,75 +30,88 @@ import org.apache.ibatis.reflection.ExceptionUtil;
  */
 public class Plugin implements InvocationHandler {
 
-  private Object target;
-  private Interceptor interceptor;
-  private Map<Class<?>, Set<Method>> signatureMap;
+	private Object target;
+	private Interceptor interceptor;
+	private Map<Class<?>, Set<Method>> signatureMap;
 
-  private Plugin(Object target, Interceptor interceptor, Map<Class<?>, Set<Method>> signatureMap) {
-    this.target = target;
-    this.interceptor = interceptor;
-    this.signatureMap = signatureMap;
-  }
+	private Plugin(Object target, Interceptor interceptor, Map<Class<?>, Set<Method>> signatureMap) {
+		this.target = target;
+		this.interceptor = interceptor;
+		this.signatureMap = signatureMap;
+	}
 
-  public static Object wrap(Object target, Interceptor interceptor) {
-    Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
-    Class<?> type = target.getClass();
-    Class<?>[] interfaces = getAllInterfaces(type, signatureMap);
-    if (interfaces.length > 0) {
-      return Proxy.newProxyInstance(
-          type.getClassLoader(),
-          interfaces,
-          new Plugin(target, interceptor, signatureMap));
-    }
-    return target;
-  }
+	/**
+	 * <h3></h3>
+	 * @param target
+	 * @param interceptor
+	 * @return
+	 */
+	public static Object wrap(Object target, Interceptor interceptor) {
+		Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
+		Class<?> type = target.getClass();
+		Class<?>[] interfaces = getAllInterfaces(type, signatureMap);
+		if (interfaces.length > 0) {
+			return Proxy.newProxyInstance(type.getClassLoader(), interfaces, new Plugin(target, interceptor, signatureMap));
+		}
+		return target;
+	}
 
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    try {
-      Set<Method> methods = signatureMap.get(method.getDeclaringClass());
-      if (methods != null && methods.contains(method)) {
-        return interceptor.intercept(new Invocation(target, method, args));
-      }
-      return method.invoke(target, args);
-    } catch (Exception e) {
-      throw ExceptionUtil.unwrapThrowable(e);
-    }
-  }
+	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		try {
+			Set<Method> methods = signatureMap.get(method.getDeclaringClass());
+			// 如果这个方法是最终的、被代理的实际目标的方法，那么就把它交给拦截器处理。
+			if (methods != null && methods.contains(method)) {
+				/*
+				 * 这里没有执行被拦截的方法，因为这个方法有可能不是当前 InvocationHandler 的 target 的方法，
+				 * 方法是实际应该被拦截的目标的方法，target 有可能不是那个实际目标，MyBatis 实际应用中，
+				 * 应该被拦截的目标会被多层次地被代理，所以这里的 target 有可能是其中某一层的代理对象。
+				 */
+				/*
+				 * 这里没有要求目标方法的调用，不归这里管，由拦截器来决定如何处理。
+				 */
+				return interceptor.intercept(new Invocation(target, method, args));
+			}
+			// 这里说明这个方法不是被代理对象的方法，就没有拦截处理的需要。
+			return method.invoke(target, args);
+		} catch (Exception e) {
+			throw ExceptionUtil.unwrapThrowable(e);
+		}
+	}
 
-  private static Map<Class<?>, Set<Method>> getSignatureMap(Interceptor interceptor) {
-    Intercepts interceptsAnnotation = interceptor.getClass().getAnnotation(Intercepts.class);
-    if (interceptsAnnotation == null) { // issue #251
-      throw new PluginException("No @Intercepts annotation was found in interceptor " + interceptor.getClass().getName());      
-    }
-    Signature[] sigs = interceptsAnnotation.value();
-    Map<Class<?>, Set<Method>> signatureMap = new HashMap<Class<?>, Set<Method>>();
-    for (Signature sig : sigs) {
-      Set<Method> methods = signatureMap.get(sig.type());
-      if (methods == null) {
-        methods = new HashSet<Method>();
-        signatureMap.put(sig.type(), methods);
-      }
-      try {
-        Method method = sig.type().getMethod(sig.method(), sig.args());
-        methods.add(method);
-      } catch (NoSuchMethodException e) {
-        throw new PluginException("Could not find method on " + sig.type() + " named " + sig.method() + ". Cause: " + e, e);
-      }
-    }
-    return signatureMap;
-  }
+	private static Map<Class<?>, Set<Method>> getSignatureMap(Interceptor interceptor) {
+		Intercepts interceptsAnnotation = interceptor.getClass().getAnnotation(Intercepts.class);
+		if (interceptsAnnotation == null) { // issue #251
+			throw new PluginException("No @Intercepts annotation was found in interceptor " + interceptor.getClass().getName());
+		}
+		Signature[] sigs = interceptsAnnotation.value();
+		Map<Class<?>, Set<Method>> signatureMap = new HashMap<Class<?>, Set<Method>>();
+		for (Signature sig : sigs) {
+			Set<Method> methods = signatureMap.get(sig.type());
+			if (methods == null) {
+				methods = new HashSet<Method>();
+				signatureMap.put(sig.type(), methods);
+			}
+			try {
+				Method method = sig.type().getMethod(sig.method(), sig.args());
+				methods.add(method);
+			} catch (NoSuchMethodException e) {
+				throw new PluginException("Could not find method on " + sig.type() + " named " + sig.method() + ". Cause: " + e, e);
+			}
+		}
+		return signatureMap;
+	}
 
-  private static Class<?>[] getAllInterfaces(Class<?> type, Map<Class<?>, Set<Method>> signatureMap) {
-    Set<Class<?>> interfaces = new HashSet<Class<?>>();
-    while (type != null) {
-      for (Class<?> c : type.getInterfaces()) {
-        if (signatureMap.containsKey(c)) {
-          interfaces.add(c);
-        }
-      }
-      type = type.getSuperclass();
-    }
-    return interfaces.toArray(new Class<?>[interfaces.size()]);
-  }
+	private static Class<?>[] getAllInterfaces(Class<?> type, Map<Class<?>, Set<Method>> signatureMap) {
+		Set<Class<?>> interfaces = new HashSet<Class<?>>();
+		while (type != null) {
+			for (Class<?> c : type.getInterfaces()) {
+				if (signatureMap.containsKey(c)) {
+					interfaces.add(c);
+				}
+			}
+			type = type.getSuperclass();
+		}
+		return interfaces.toArray(new Class<?>[interfaces.size()]);
+	}
 
 }
