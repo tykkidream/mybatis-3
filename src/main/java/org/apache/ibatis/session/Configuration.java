@@ -519,13 +519,16 @@ public class Configuration {
 
 	/**
 	 * <h3>创建执行器 Executor</h3>
+	 * <p>先来了解下内部具体的内容和功能步骤：</p>
 	 * <ol>
 	 * <li>根据参数 executorType 所代表不同的执行方式，创建不同类型的、使用了参数 transaction 的执行器。{@link ExecutorType#BATCH} 使用 {@link BatchExecutor} 执行器，
 	 * {@link ExecutorType#REUSE} 使用 {@link ReuseExecutor} 执行器，否则其它的为 {@link ExecutorType#SIMPLE} 使用 {@link SimpleExecutor} 执行器。</li>
 	 * <li>如果启用缓存，使用缓存执行器包装上一步的执行器 {@link CachingExecutor} 。</li>
 	 * <li>拦截器层层次次地包装上一步的执行器。使用了动态代理技术。</li>
 	 * </ol>
-	 * 
+	 * <p>
+	 * 从上面的步骤可以看出，主要是3个方面的步骤，经过了这些步骤后，最后得到的对象肯定不是原来对对象，而是代理对象。
+	 * </p>
 	 * @param transaction
 	 * @param executorType
 	 * @return
