@@ -72,6 +72,9 @@ public class TransactionalCache implements Cache {
     return delegate.getObject(key);
   }
 
+  /**
+   * 
+   */
   @Override
   public void clear() {
     reset();

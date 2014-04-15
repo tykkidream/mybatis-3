@@ -88,7 +88,7 @@ public final class MappedStatement {
 	 */
 	private SqlSource sqlSource;
 	/**
-	 * <h3>对应配置中的 属性</h3>
+	 * <h3>缓存</h3>
 	 * <p>
 	 * </p>
 	 */
@@ -372,6 +372,11 @@ public final class MappedStatement {
 		return resultMaps;
 	}
 
+	/**
+	 * <h3>获取缓存</h3>
+	 * <p>这个缓存不时全局共享的，是当前实例自己的。</p>
+	 * @return
+	 */
 	public Cache getCache() {
 		return cache;
 	}

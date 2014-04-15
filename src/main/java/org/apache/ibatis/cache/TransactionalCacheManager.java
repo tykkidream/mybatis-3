@@ -51,6 +51,11 @@ public class TransactionalCacheManager {
     }
   }
 
+  /**
+   * 
+   * @param cache
+   * @return
+   */
   private TransactionalCache getTransactionalCache(Cache cache) {
     TransactionalCache txCache = transactionalCaches.get(cache);
     if (txCache == null) {

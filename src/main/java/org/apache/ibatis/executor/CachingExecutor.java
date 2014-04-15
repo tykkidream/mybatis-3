@@ -44,6 +44,9 @@ import org.apache.ibatis.transaction.Transaction;
  */
 public class CachingExecutor implements Executor {
 
+	/**
+	 * 
+	 */
 	private Executor delegate;
 	private TransactionalCacheManager tcm = new TransactionalCacheManager();
 
@@ -86,8 +89,10 @@ public class CachingExecutor implements Executor {
 
 	public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql)
 			throws SQLException {
+		// 获取缓存
 		Cache cache = ms.getCache();
 		if (cache != null) {
+			// 
 			flushCacheIfRequired(ms);
 			if (ms.isUseCache() && resultHandler == null) {
 				ensureNoOutParams(ms, parameterObject, boundSql);
@@ -103,6 +108,8 @@ public class CachingExecutor implements Executor {
 				return list;
 			}
 		}
+		
+		// 当不没有启用缓存时，交由原本功能的方法处理。
 		return delegate.<E> query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
 	}
 
@@ -151,7 +158,11 @@ public class CachingExecutor implements Executor {
 	public void clearLocalCache() {
 		delegate.clearLocalCache();
 	}
-
+	
+	/**
+	 * 
+	 * @param ms
+	 */
 	private void flushCacheIfRequired(MappedStatement ms) {
 		Cache cache = ms.getCache();
 		if (cache != null && ms.isFlushCacheRequired()) {
