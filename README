@@ -1,6 +1,13 @@
-The MyBatis data mapper framework makes it easier to use a relational database with object-oriented applications.
-MyBatis couples objects with stored procedures or SQL statements using a XML descriptor or annotations.
-Simplicity is the biggest advantage of the MyBatis data mapper over object relational mapping tools.
+MyBatis3源码分析
 
-See the docs in: http://mybatis.github.io/mybatis-3
-Download it from: https://github.com/mybatis/mybatis-3/releases
+============================================================================
+
+分析内部原理，并在注释里说明。
+
+说明由本人理解而写，水平有限，文笔也差，仅仅满足自己的学习而已，不保证能适应广众的阅读。
+
+在平常使用中发现3.2.6版的一些接口或类定义和旧版有所不同的，所以分析的内容可能不通用。
+
+另有UML图，文件是 mybatis.mdl，编辑软件是IBM 的 Rational Rose。
+
+没有修改任何源代码，分析时 MyBatis 的版本号是3.2.6，此后没有更新官方的新代码。
